@@ -22,11 +22,23 @@ app.use((req, res, next) => {
 });
 
 /**
+ * Health check endpoint for Railway / Cloud monitoring
+ */
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptimeSeconds: Math.floor(process.uptime()),
+    memoryUsageMb: Math.round(process.memoryUsage().heapUsed / 1024 / 1024)
+  });
+});
+
+/**
  * GET /api/hybrid-search?q=UGM+Yogyakarta&radius=2
  */
 app.get('/api/hybrid-search', async (req, res) => {
   try {
-    const query = req.query.q || 'UGM Yogyakarta';
+    const query = req.query.q || 'Jakarta';
     const radiusKm = parseFloat(req.query.radius || '2.0');
     const centerLat = req.query.lat ? parseFloat(req.query.lat) : null;
     const centerLng = req.query.lng ? parseFloat(req.query.lng) : null;
@@ -52,7 +64,7 @@ app.get('/api/hybrid-search', async (req, res) => {
       tiktokLeads: tiktok.status === 'fulfilled' ? tiktok.value : { error: tiktok.reason }
     };
 
-    queryCache.set(cacheKey, resultPayload, 600000); // Cache for 10 minutes
+    queryCache.set(cacheKey, resultPayload, 600000); // 10 minutes cache
 
     res.json({ success: true, cached: false, ...resultPayload });
   } catch (err) {
@@ -78,8 +90,9 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n==================================================`);
-  console.log(`🌐 [Inkos Production Server] Running on Port ${PORT}`);
+  console.log(`🌐 [InKOS Production Server] Running on Port ${PORT}`);
+  console.log(`📡 Healthcheck: http://localhost:${PORT}/api/health`);
   console.log(`==================================================\n`);
 });
