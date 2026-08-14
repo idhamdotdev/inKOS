@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>InKOS by idham.dev - Rental & Kost Intelligence</title>
+  
+  <!-- Minimalist Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    :root {
+      --bg-canvas: #09090b;
+      --bg-panel: rgba(13, 17, 23, 0.94);
+      --bg-card: #161b22;
+      --bg-card-hover: #1f242c;
+      --text-primary: #f0f6fc;
+      --text-secondary: #8b949e;
+      --text-tertiary: #6e7681;
+      --border: rgba(240, 246, 252, 0.1);
+      --border-hover: rgba(240, 246, 252, 0.25);
+      --radius-lg: 12px;
+      --radius-md: 8px;
+      --radius-sm: 6px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', -apple-system, sans-serif; }
+    body { background-color: var(--bg-canvas); color: var(--text-primary); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+    /* Minimal Header matching STICam */
+    header {
+      height: 56px;
+      background: #09090b;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      z-index: 1000;
+    }
+
+    .brand-container { display: flex; align-items: center; gap: 8px; }
+    
+    .brand-logo {
+      font-family: 'Outfit', 'Inter', -apple-system, sans-serif;
+      font-weight: 900;
+      font-size: 24px;
+      letter-spacing: -0.8px;
+      color: #ffffff;
+      display: flex;
+      align-items: baseline;
+      text-decoration: none;
+      user-select: none;
+    }
+    .brand-logo .by-author {
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      color: rgba(255, 255, 255, 0.8);
+      margin-left: 3px;
+      letter-spacing: -0.2px;
+    }
+
+    .header-status { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-secondary); }
+    .status-dot { width: 6px; height: 6px; background: #f0f6fc; border-radius: 50%; }
+
+    .main-wrapper { flex: 1; display: flex; position: relative; overflow: hidden; }
+    #map { flex: 1; height: 100%; background: #e5e7eb; }
+
+    /* Monochrome SVG Outline Icon Styles */
+    .icon {
+      width: 14px;
+      height: 14px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      display: inline-block;
+      vertical-align: middle;
+    }
+
+    /* Onboarding Popup Modal Overlay */
+    .modal-overlay {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(9, 9, 11, 0.85);
+      backdrop-filter: blur(8px);
+      z-index: 2000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-card {
+      background: #161b22;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      width: 100%;
+      max-width: 440px;
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.8);
+    }
+
+    .modal-title { font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 22px; color: #fff; letter-spacing: -0.4px; }
+    .modal-subtitle { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+
+    .modal-search-box {
+      display: flex;
+      background: #0d1117;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 3px;
+    }
+    .modal-search-box:focus-within { border-color: var(--text-primary); }
+
+    .modal-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: #fff;
+      padding: 10px 14px;
+      font-size: 14px;
+      outline: none;
+    }
+
+    .btn-modal-primary {
+      background: #f0f6fc;
+      color: #0d1117;
+      border: none;
+      font-weight: 700;
+      font-size: 13px;
+      padding: 10px 16px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+    .btn-modal-primary:hover { background: #ffffff; }
+
+    .modal-options { display: flex; flex-direction: column; gap: 8px; }
+    .btn-option {
+      background: #0d1117;
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      padding: 10px 14px;
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: all 0.15s;
+    }
+    .btn-option:hover { background: #21262d; border-color: var(--border-hover); }
+
+    .presets-row { display: flex; gap: 6px; flex-wrap: wrap; }
+    .preset-chip {
+      background: #0d1117;
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      padding: 5px 10px;
+      border-radius: 99px;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .preset-chip:hover { border-color: var(--text-primary); color: #fff; }
+
+    /* Minimalist Sidebar */
+    .sidebar {
+      width: 420px;
+      background: var(--bg-panel);
+      backdrop-filter: blur(16px);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      z-index: 999;
+    }
+
+    .search-panel { padding: 18px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 14px; }
+    .input-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-tertiary); margin-bottom: 6px; display: block; }
+
+    .search-box {
+      display: flex;
+      background: #0d1117;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 3px;
+    }
+    .search-box:focus-within { border-color: var(--border-hover); }
+
+    .search-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: #fff;
+      padding: 8px 12px;
+      font-size: 13px;
+      outline: none;
+    }
+
+    .btn-action {
+      background: #f0f6fc;
+      color: #0d1117;
+      border: none;
+      font-weight: 700;
+      font-size: 12px;
+      padding: 8px 14px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+    .btn-action:hover { background: #ffffff; }
+
+    .radius-wrapper { display: flex; flex-direction: column; gap: 6px; }
+    .radius-meta { display: flex; justify-content: space-between; align-items: center; }
+    .radius-val { font-weight: 700; color: var(--text-primary); font-size: 13px; }
+
+    .radius-slider {
+      width: 100%; height: 3px; background: #21262d; border-radius: 2px; outline: none; accent-color: #f0f6fc; cursor: pointer;
+    }
+
+    /* Minimal Tabs */
+    .tabs-bar { display: flex; border-bottom: 1px solid var(--border); background: #09090b; }
+    .tab-btn {
+      flex: 1; padding: 10px; text-align: center; font-size: 12px; font-weight: 600; color: var(--text-tertiary);
+      cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; display: flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    .tab-btn.active { color: #fff; border-bottom-color: #f0f6fc; }
+
+    /* Results List & Minimal Cards */
+    .results-container { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+
+    .result-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: all 0.15s;
+    }
+    .result-card:hover { background: var(--bg-card-hover); border-color: var(--border-hover); }
+
+    .card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+    .card-title { font-weight: 600; font-size: 14px; color: #fff; line-height: 1.3; }
+    .card-price { font-weight: 700; font-size: 14px; color: #f0f6fc; white-space: nowrap; }
+
+    .card-tags { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+    .pill-tag {
+      background: #0d1117;
+      border: 1px solid var(--border);
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .amenities-row { display: flex; gap: 4px; flex-wrap: wrap; }
+    .amenity-chip { font-size: 10px; color: var(--text-tertiary); background: #0d1117; padding: 2px 5px; border-radius: 3px; border: 1px solid rgba(240,246,252,0.06); }
+
+    .btn-link {
+      background: #0d1117;
+      color: var(--text-primary);
+      font-size: 11px;
+      font-weight: 600;
+      text-decoration: none;
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s;
+      border: 1px solid var(--border);
+    }
+    .btn-link:hover { background: #21262d; border-color: var(--border-hover); }
+
+    /* Minimalist Map Marker Badges */
+    .gmaps-price-marker {
+      background: #09090b;
+      border: 1px solid rgba(240, 246, 252, 0.3);
+      color: #ffffff;
+      font-weight: 700;
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      white-space: nowrap;
+    }
+
+    .loader { display: none; text-align: center; padding: 30px 20px; color: var(--text-secondary); }
+    .spinner { width: 24px; height: 24px; border: 2px solid var(--border); border-top-color: #f0f6fc; border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 10px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #21262d; border-radius: 2px; }
+  </style>
+</head>
+<body>
+
+  <!-- Minimalist Onboarding Popup Modal -->
+  <div id="welcomeModal" class="modal-overlay">
+    <div class="modal-card">
+      <div>
+        <div class="modal-title">Where do you want to look?</div>
+        <div class="modal-subtitle" style="margin-top: 4px;">Search location or area for available Kost and Apartment listings.</div>
+      </div>
+
+      <div class="modal-search-box">
+        <input type="text" id="modalInput" class="modal-input" placeholder="e.g. Kuningan Jakarta, Depok, UGM, ITS">
+        <button id="modalSearchBtn" class="btn-modal-primary">
+          <svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <span>Search</span>
+        </button>
+      </div>
+
+      <div class="modal-options">
+        <button id="btnGeoLoc" class="btn-option">
+          <span style="display:flex; align-items:center; gap:8px;">
+            <svg class="icon" viewBox="0 0 24 24"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>
+            Use Current GPS Location
+          </span>
+          <span style="color: var(--text-tertiary);">→</span>
+        </button>
+        <button id="btnPinMap" class="btn-option">
+          <span style="display:flex; align-items:center; gap:8px;">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+            Pinpoint on Map
+          </span>
+          <span style="color: var(--text-tertiary);">Click Map</span>
+        </button>
+      </div>
+
+      <div>
+        <div style="font-size: 10px; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; margin-bottom: 6px;">Popular Areas</div>
+        <div class="presets-row">
+          <div class="preset-chip" onclick="selectPreset('Jakarta Selatan')">Jakarta Selatan</div>
+          <div class="preset-chip" onclick="selectPreset('Kuningan Jakarta')">Kuningan</div>
+          <div class="preset-chip" onclick="selectPreset('Depok UI')">Depok UI</div>
+          <div class="preset-chip" onclick="selectPreset('Yogyakarta')">Yogyakarta</div>
+          <div class="preset-chip" onclick="selectPreset('Bandung')">Bandung</div>
+          <div class="preset-chip" onclick="selectPreset('ITS Surabaya')">Surabaya</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <header>
+    <div class="brand-container">
+      <a href="https://idham.dev" target="_blank" class="brand-logo">
+        InKOS<span class="by-author">by idham.dev</span>
+      </a>
+    </div>
+
+    <div class="header-status">
+      <div class="status-dot"></div>
+      <span>Online</span>
+    </div>
+  </header>
+
+  <div class="main-wrapper">
+    <div id="map"></div>
+
+    <div class="sidebar">
+      <div class="search-panel">
+        <div>
+          <span class="input-label">Target Location</span>
+          <div class="search-box">
+            <input type="text" id="searchInput" class="search-input" value="" placeholder="Search location or click map...">
+            <button id="searchBtn" class="btn-action">
+              <svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <span>Search</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="radius-wrapper">
+          <div class="radius-meta">
+            <span class="input-label" style="margin-bottom:0;">Search Radius</span>
+            <span id="radiusVal" class="radius-val">1.5 km</span>
+          </div>
+          <input type="range" id="radiusInput" class="radius-slider" min="0.5" max="5.0" step="0.5" value="1.5">
+        </div>
+      </div>
+
+      <div class="tabs-bar">
+        <div id="tabGmaps" class="tab-btn active">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+          <span>Google Maps (<span id="gmapsCount">0</span>)</span>
+        </div>
+        <div id="tabTiktok" class="tab-btn">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"></path></svg>
+          <span>TikTok Leads (<span id="tiktokCount">0</span>)</span>
+        </div>
+      </div>
+
+      <div id="loading" class="loader">
+        <div class="spinner"></div>
+        <div style="font-size: 12px; font-weight: 600; color: #fff;">Searching Area</div>
+        <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 2px;">Scraping Google Places and TikTok threads</div>
+      </div>
+
+      <div id="resultsList" class="results-container">
+        <div style="color: var(--text-tertiary); text-align: center; padding: 40px 20px; font-size: 12px;">
+          Search location above or click map to begin.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    let map, circleOverlay, centerMarker;
+    let markersLayer = L.layerGroup();
+    let currentData = { googleMaps: [], tiktok: [] };
+    let currentTab = 'gmaps';
+
+    function initMap() {
+      map = L.map('map', { zoomControl: false }).setView([-6.2088, 106.8456], 12);
+      L.control.zoom({ position: 'topleft' }).addTo(map);
+
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap &copy; CARTO &bull; InKOS by idham.dev',
+        maxZoom: 19
+      }).addTo(map);
+
+      markersLayer.addTo(map);
+
+      map.on('click', (e) => {
+        closeModal();
+        setCenterPin(e.latlng.lat, e.latlng.lng, "Pinpoint Location");
+        performSearch(null, e.latlng.lat, e.latlng.lng);
+      });
+    }
+
+    function closeModal() {
+      const modal = document.getElementById('welcomeModal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    function selectPreset(locationName) {
+      document.getElementById('searchInput').value = locationName;
+      closeModal();
+      performSearch(locationName);
+    }
+
+    function setCenterPin(lat, lng, title) {
+      if (centerMarker) map.removeLayer(centerMarker);
+      if (circleOverlay) map.removeLayer(circleOverlay);
+
+      const radiusKm = parseFloat(document.getElementById('radiusInput').value);
+
+      centerMarker = L.marker([lat, lng], {
+        icon: L.divIcon({
+          className: 'center-pin',
+          html: `<div style="background: #09090b; color: #ffffff; border: 1px solid rgba(240,246,252,0.3); padding: 4px 10px; border-radius: 14px; font-weight: 700; font-size: 11px;">${title}</div>`,
+          iconSize: [120, 24],
+          iconAnchor: [60, 12]
+        })
+      }).addTo(map);
+
+      circleOverlay = L.circle([lat, lng], {
+        color: '#4b5563',
+        fillColor: '#6b7280',
+        fillOpacity: 0.1,
+        weight: 1.5,
+        dashArray: '4, 4',
+        radius: radiusKm * 1000
+      }).addTo(map);
+
+      map.panTo([lat, lng]);
+    }
+
+    async function performSearch(queryStr, lat = null, lng = null) {
+      const query = queryStr || document.getElementById('searchInput').value;
+      if (!query && (!lat || !lng)) return;
+
+      closeModal();
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('resultsList').innerHTML = '';
+      markersLayer.clearLayers();
+
+      try {
+        let url = `/api/hybrid-search?q=${encodeURIComponent(query || 'Target Area')}&radius=${document.getElementById('radiusInput').value}`;
+        if (lat && lng) url += `&lat=${lat}&lng=${lng}`;
+
+        const res = await fetch(url);
+        const json = await res.json();
+
+        document.getElementById('loading').style.display = 'none';
+
+        if (json.success) {
+          const gmaps = json.googleMaps?.listings || [];
+          const tiktok = json.tiktokLeads?.recommendations || [];
+
+          currentData = { googleMaps: gmaps, tiktok: tiktok };
+
+          document.getElementById('gmapsCount').innerText = gmaps.length;
+          document.getElementById('tiktokCount').innerText = tiktok.length;
+
+          const center = json.googleMaps?.searchCenter || { lat: lat || -6.2088, lng: lng || 106.8456, displayName: query };
+          setCenterPin(center.lat, center.lng, query || "Search Point");
+
+          gmaps.forEach(item => {
+            const markerIcon = L.divIcon({
+              className: 'custom-pin-wrapper',
+              html: `<div class="gmaps-price-marker">${item.priceText}</div>`,
+              iconSize: [85, 22],
+              iconAnchor: [42, 11]
+            });
+
+            const marker = L.marker([item.latitude, item.longitude], { icon: markerIcon });
+            marker.bindPopup(`
+              <div style="font-family: Inter, sans-serif; color: #fff; background: #161b22; padding: 6px; border-radius: 6px;">
+                <strong style="font-size: 12px; color:#fff;">${item.title}</strong><br>
+                <span style="color: #f0f6fc; font-weight: bold;">${item.priceText}</span><br>
+                <small style="color:#8b949e;">${item.distanceKm} km from center</small><br>
+                <a href="${item.googleMapsUrl}" target="_blank" style="display:inline-block; margin-top:6px; background:#f0f6fc; color:#0d1117; padding:4px 8px; border-radius:4px; text-decoration:none; font-size:10px; font-weight:bold;">Google Maps</a>
+              </div>
+            `);
+            markersLayer.addLayer(marker);
+          });
+
+          renderResults();
+        }
+      } catch (err) {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('resultsList').innerHTML = `<div style="color: #f87171; padding: 16px; font-size: 12px;">Error: ${err.message}</div>`;
+      }
+    }
+
+    function renderResults() {
+      const container = document.getElementById('resultsList');
+      container.innerHTML = '';
+
+      if (currentTab === 'gmaps') {
+        if (currentData.googleMaps.length === 0) {
+          container.innerHTML = `<div style="color: var(--text-tertiary); text-align: center; padding: 30px; font-size: 12px;">No listings found within this radius.</div>`;
+          return;
+        }
+
+        currentData.googleMaps.forEach(item => {
+          const card = document.createElement('div');
+          card.className = 'result-card';
+          card.innerHTML = `
+            <div class="card-top">
+              <div class="card-title">${item.title}</div>
+              <div class="card-price">${item.priceText}</div>
+            </div>
+            <div class="card-tags">
+              <span class="pill-tag">${item.category}</span>
+              <span class="pill-tag">
+                <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                ${item.distanceKm} km
+              </span>
+              <span class="pill-tag">
+                <svg class="icon" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                ${item.rating}
+              </span>
+            </div>
+            <div class="amenities-row">
+              ${item.amenities.map(a => `<span class="amenity-chip">${a}</span>`).join('')}
+            </div>
+            <div style="display: flex; gap: 6px; margin-top: 2px;">
+              <a href="${item.googleMapsUrl}" target="_blank" class="btn-link">
+                <svg class="icon" viewBox="0 0 24 24"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></svg>
+                Google Maps
+              </a>
+              ${item.whatsappUrl ? `
+              <a href="${item.whatsappUrl}" target="_blank" class="btn-link">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                WhatsApp
+              </a>` : ''}
+            </div>
+          `;
+          container.appendChild(card);
+        });
+
+      } else {
+        if (currentData.tiktok.length === 0) {
+          container.innerHTML = `<div style="color: var(--text-tertiary); text-align: center; padding: 30px; font-size: 12px;">No TikTok recommendations parsed.</div>`;
+          return;
+        }
+
+        currentData.tiktok.forEach(item => {
+          const card = document.createElement('div');
+          card.className = 'result-card';
+          card.innerHTML = `
+            <div class="card-top">
+              <div class="card-title" style="font-size: 12px; color: var(--text-secondary); display:flex; align-items:center; gap:6px;">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"></path></svg>
+                ${item.source}
+              </div>
+              <div class="card-price">${item.estimatedPrice}</div>
+            </div>
+            <div style="font-size: 12px; color: #c9d1d9; background: #0d1117; padding: 8px 10px; border-radius: 6px; line-height: 1.4; border: 1px solid var(--border);">
+              "${item.commentText}"
+            </div>
+            <div class="card-tags">
+              <span class="pill-tag">${item.genderType}</span>
+            </div>
+            <div class="amenities-row">
+              ${item.amenities.map(a => `<span class="amenity-chip">${a}</span>`).join('')}
+            </div>
+            <div style="display: flex; gap: 6px; margin-top: 2px;">
+              ${item.whatsappUrl ? `
+              <a href="${item.whatsappUrl}" target="_blank" class="btn-link">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                WhatsApp (${item.phone})
+              </a>` : ''}
+              <a href="${item.tiktokVideoUrl}" target="_blank" class="btn-link">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"></path></svg>
+                TikTok Video
+              </a>
+            </div>
+          `;
+          container.appendChild(card);
+        });
+      }
+    }
+
+    document.getElementById('modalSearchBtn').addEventListener('click', () => {
+      const q = document.getElementById('modalInput').value;
+      if (q) {
+        document.getElementById('searchInput').value = q;
+        performSearch(q);
+      }
+    });
+    document.getElementById('modalInput').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        const q = document.getElementById('modalInput').value;
+        if (q) {
+          document.getElementById('searchInput').value = q;
+          performSearch(q);
+        }
+      }
+    });
+
+    document.getElementById('btnGeoLoc').addEventListener('click', () => {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition((pos) => {
+          closeModal();
+          document.getElementById('searchInput').value = "My Location";
+          setCenterPin(pos.coords.latitude, pos.coords.longitude, "My Location");
+          performSearch(null, pos.coords.latitude, pos.coords.longitude);
+        }, (err) => {
+          alert("GPS Location permission denied or unavailable.");
+        });
+      }
+    });
+
+    document.getElementById('btnPinMap').addEventListener('click', () => {
+      closeModal();
+    });
+
+    document.getElementById('searchBtn').addEventListener('click', () => performSearch());
+    document.getElementById('searchInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') performSearch(); });
+    document.getElementById('radiusInput').addEventListener('input', (e) => {
+      document.getElementById('radiusVal').innerText = `${e.target.value} km`;
+    });
+    document.getElementById('radiusInput').addEventListener('change', () => performSearch());
+
+    document.getElementById('tabGmaps').addEventListener('click', () => {
+      currentTab = 'gmaps';
+      document.getElementById('tabGmaps').classList.add('active');
+      document.getElementById('tabTiktok').classList.remove('active');
+      renderResults();
+    });
+
+    document.getElementById('tabTiktok').addEventListener('click', () => {
+      currentTab = 'tiktok';
+      document.getElementById('tabTiktok').classList.add('active');
+      document.getElementById('tabGmaps').classList.remove('active');
+      renderResults();
+    });
+
+    window.addEventListener('load', initMap);
+  </script>
+</body>
+</html>
