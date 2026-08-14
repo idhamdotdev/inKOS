@@ -1,0 +1,48 @@
+name: InKOS CI Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Install Playwright Browsers
+      run: npx playwright install --with-deps chromium
+
+    - name: Run Backend Math & Scraper Unit Checks
+      run: |
+        node -e "
+        import('./src/utils/haversine.js').then(({ calculateDistanceKm }) => {
+          const d = calculateDistanceKm(-6.2088, 106.8456, -6.2188, 106.8456);
+          if (d > 0 && d < 2) console.log('✅ Haversine distance math verified:', d);
+          else process.exit(1);
+        });
+        "
+        node -e "
+        import('./src/scraper/extractors.js').then(({ extractPrice, extractPhone }) => {
+          const p = extractPrice('Kost murah Rp 1.500.000 / bulan WA 081289456720');
+          const ph = extractPhone('WA 081289456720');
+          if (p.rawPriceMonth === 1500000 && ph.rawNumber.includes('6281289456720')) {
+            console.log('✅ Regex extractor verified:', p, ph);
+          } else {
+            process.exit(1);
+          }
+        });
+        "

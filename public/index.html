@@ -64,11 +64,11 @@
       letter-spacing: -0.2px;
     }
 
-    .header-actions { display: flex; align-items: center; gap: 12px; }
-    .header-status { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-secondary); }
+    .header-actions { display: flex; align-items: center; gap: 8px; }
+    .header-status { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-secondary); margin-left: 4px; }
     .status-dot { width: 6px; height: 6px; background: #38bdf8; border-radius: 50%; }
 
-    .btn-share {
+    .btn-header {
       background: #161b22;
       border: 1px solid var(--border);
       color: var(--text-primary);
@@ -82,7 +82,7 @@
       gap: 6px;
       transition: all 0.15s;
     }
-    .btn-share:hover { background: #21262d; border-color: var(--border-hover); }
+    .btn-header:hover { background: #21262d; border-color: var(--border-hover); }
 
     .main-wrapper { flex: 1; display: flex; position: relative; overflow: hidden; }
     #map { flex: 1; height: 100%; background: #e5e7eb; }
@@ -314,6 +314,7 @@
       align-items: center;
       gap: 4px;
     }
+    .pill-tag.fresh { border-color: rgba(56, 189, 248, 0.4); color: #38bdf8; }
 
     .amenities-row { display: flex; gap: 4px; flex-wrap: wrap; }
     .amenity-chip { font-size: 10px; color: var(--text-tertiary); background: #0d1117; padding: 2px 5px; border-radius: 3px; border: 1px solid rgba(240,246,252,0.06); }
@@ -426,7 +427,12 @@
     </div>
 
     <div class="header-actions">
-      <button id="btnShareUrl" class="btn-share">
+      <button id="btnExportCsv" class="btn-header" title="Download results as CSV">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        <span>Export CSV</span>
+      </button>
+
+      <button id="btnShareUrl" class="btn-header">
         <svg class="icon" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
         <span id="shareText">Share</span>
       </button>
@@ -538,7 +544,6 @@
 
       updateSavedCount();
 
-      // Check URL query parameters (e.g. ?q=Kuningan&r=2)
       const urlParams = new URLSearchParams(window.location.search);
       const qParam = urlParams.get('q');
       const rParam = urlParams.get('r');
@@ -601,7 +606,6 @@
 
       const radius = document.getElementById('radiusInput').value;
 
-      // Update URL parameters without reload
       if (query && query !== "My Location") {
         window.history.replaceState({}, '', `?q=${encodeURIComponent(query)}&r=${radius}`);
       }
@@ -691,6 +695,36 @@
       document.getElementById('savedCount').innerText = savedListings.length;
     }
 
+    // Export to CSV Function
+    function exportToCsv() {
+      const allItems = [...(currentData.googleMaps || []), ...(currentData.tiktok || [])];
+      if (allItems.length === 0) {
+        alert("No listings available to export. Run a search first.");
+        return;
+      }
+
+      let csv = "ID,Title / Source,Price,Gender,Distance Km,Rating,Phone,Link\n";
+      allItems.forEach(item => {
+        const title = (item.title || item.source || '').replace(/"/g, '""');
+        const price = (item.priceText || item.estimatedPrice || '').replace(/"/g, '""');
+        const gender = item.genderType || '';
+        const dist = item.distanceKm || '';
+        const rating = item.rating || '';
+        const phone = item.phone || '';
+        const link = item.googleMapsUrl || item.tiktokVideoUrl || '';
+        csv += `"${item.id}","${title}","${price}","${gender}","${dist}","${rating}","${phone}","${link}"\n`;
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `inkos_listings_${Date.now()}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
     function renderResults() {
       const container = document.getElementById('resultsList');
       container.innerHTML = '';
@@ -773,6 +807,7 @@
             </div>
             <div class="card-tags">
               <span class="pill-tag">${item.genderType}</span>
+              ${item.dateLabel ? `<span class="pill-tag fresh">${item.dateLabel}</span>` : ''}
             </div>
             <div class="amenities-row">
               ${item.amenities.map(a => `<span class="amenity-chip">${a}</span>`).join('')}
@@ -881,6 +916,9 @@
         setTimeout(() => { txt.innerText = 'Share'; }, 2000);
       });
     });
+
+    // Export CSV
+    document.getElementById('btnExportCsv').addEventListener('click', exportToCsv);
 
     document.getElementById('tabGmaps').addEventListener('click', () => {
       currentTab = 'gmaps';
