@@ -1,5 +1,5 @@
 /**
- * Advanced Indonesian Rental Data Extractor & NLP Normalizer
+ * Advanced Indonesian Rental Data Extractor & Direct-Owner NLP Normalizer
  */
 
 export function extractPrice(text = '') {
@@ -22,7 +22,6 @@ export function extractPrice(text = '') {
       if (num < 1000) num = num * 1000;
     }
 
-    // Convert yearly to monthly equivalent if stated as /tahun
     let isYearly = period.includes('thn') || period.includes('tahun') || (num >= 8000000 && !period.includes('bln') && !period.includes('bulan'));
     let monthlyEquivalent = isYearly ? Math.round(num / 12) : Math.round(num);
 
@@ -57,7 +56,6 @@ export function extractPrice(text = '') {
 
 export function extractPhone(text = '') {
   if (!text) return null;
-  // Match Indonesian mobile numbers (08xx, +628xx, 628xx, with optional hyphens/spaces)
   const phoneRegex = /(?:\+?62|0)8[1-9][0-9\s-]{7,12}\b/;
   const match = text.match(phoneRegex);
   if (match) {
@@ -115,7 +113,17 @@ export function extractRoomSpecs(text = '') {
     curfew = 'Akses 24 Jam (Pegang Kunci)';
   }
 
-  return { size, electricity, curfew };
+  // Direct Owner Tagging
+  const isDirectOwner = 
+    lower.includes('tanpa perantara') || 
+    lower.includes('langsung pemilik') || 
+    lower.includes('owner') || 
+    lower.includes('ibu kos') || 
+    lower.includes('bapak kos') || 
+    lower.includes('wa') || 
+    !lower.includes('agen');
+
+  return { size, electricity, curfew, isDirectOwner };
 }
 
 export function extractAmenities(text = '') {
