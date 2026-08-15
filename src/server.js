@@ -3,7 +3,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { scrapeKostInRadius, geocodeLocation } from './scraper/gmapsScraper.js';
 import { scrapeSocialHiddenGems } from './scraper/socialScraper.js';
-import { scrapeRentalDirectory } from './scraper/rentalScraper.js';
 import { queryCache } from './utils/cache.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -35,7 +34,7 @@ app.get('/api/health', (req, res) => {
 
 /**
  * GET /api/hybrid-search?q=UGM+Yogyakarta&radius=2&sort=newest
- * Parallel High-Speed Tri-Engine Scraper (GMaps + Social Leads + Rental Directories)
+ * 100% Real Live Scraper (Google Maps Places + Real Social Web Leads)
  */
 app.get('/api/hybrid-search', async (req, res) => {
   try {
@@ -53,22 +52,20 @@ app.get('/api/hybrid-search', async (req, res) => {
       return res.json({ success: true, cached: true, ...cachedData });
     }
 
-    console.log(`\n🚀 [Tri-Engine Search] Scraping GMaps + Social (TikTok/FB/IG) + Directories (OLX/Mamikos) for "${query}" (${radiusKm} km)...`);
+    console.log(`\n🚀 [Live Search Engine] Scraping real data for "${query}" (${radiusKm} km)...`);
 
-    const [gmaps, social, directory] = await Promise.allSettled([
-      scrapeKostInRadius({ locationQuery: query, centerLat: centerLat, centerLng: centerLng, radiusKm: radiusKm, limit: 20, headless: true }),
-      scrapeSocialHiddenGems({ locationQuery: query, sortBy: sortBy }),
-      scrapeRentalDirectory({ locationQuery: query })
+    const [gmaps, social] = await Promise.allSettled([
+      scrapeKostInRadius({ locationQuery: query, centerLat: centerLat, centerLng: centerLng, radiusKm: radiusKm, limit: 30, headless: true }),
+      scrapeSocialHiddenGems({ locationQuery: query, sortBy: sortBy })
     ]);
 
     const resultPayload = {
       timestamp: new Date().toISOString(),
       googleMaps: gmaps.status === 'fulfilled' ? gmaps.value : { error: gmaps.reason },
-      socialLeads: social.status === 'fulfilled' ? social.value : { error: social.reason },
-      rentalDirectory: directory.status === 'fulfilled' ? directory.value : []
+      socialLeads: social.status === 'fulfilled' ? social.value : { error: social.reason }
     };
 
-    queryCache.set(cacheKey, resultPayload, 300000); // 5 minutes cache
+    queryCache.set(cacheKey, resultPayload, 180000); // 3 minutes cache
 
     res.json({ success: true, cached: false, ...resultPayload });
   } catch (err) {
@@ -96,7 +93,7 @@ app.get('*', (req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n==================================================`);
-  console.log(`🌐 [InKOS Tri-Engine Scraper Running] Port: ${PORT}`);
+  console.log(`🌐 [InKOS 100% Real Live Engine Running] Port: ${PORT}`);
   console.log(`📡 Healthcheck: http://localhost:${PORT}/api/health`);
   console.log(`==================================================\n`);
 });
