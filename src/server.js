@@ -2,7 +2,7 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { scrapeKostInRadius, geocodeLocation } from './scraper/gmapsScraper.js';
-import { scrapeTikTokKostRecommendations } from './scraper/tiktokScraper.js';
+import { scrapeSocialHiddenGems } from './scraper/socialScraper.js';
 import { queryCache } from './utils/cache.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -34,7 +34,8 @@ app.get('/api/health', (req, res) => {
 });
 
 /**
- * GET /api/hybrid-search?q=UGM+Yogyakarta&radius=2
+ * GET /api/hybrid-search?q=UGM+Yogyakarta&radius=2&sort=newest
+ * Combines Google Maps Places + Multi-Source Social Leads (TikTok, Instagram, Facebook)
  */
 app.get('/api/hybrid-search', async (req, res) => {
   try {
@@ -42,8 +43,9 @@ app.get('/api/hybrid-search', async (req, res) => {
     const radiusKm = parseFloat(req.query.radius || '2.0');
     const centerLat = req.query.lat ? parseFloat(req.query.lat) : null;
     const centerLng = req.query.lng ? parseFloat(req.query.lng) : null;
+    const sortBy = req.query.sort || 'newest';
 
-    const cacheKey = `hybrid:${query}:${radiusKm}:${centerLat}:${centerLng}`;
+    const cacheKey = `hybrid:${query}:${radiusKm}:${centerLat}:${centerLng}:${sortBy}`;
     const cachedData = queryCache.get(cacheKey);
 
     if (cachedData) {
@@ -51,22 +53,37 @@ app.get('/api/hybrid-search', async (req, res) => {
       return res.json({ success: true, cached: true, ...cachedData });
     }
 
-    console.log(`\n🚀 [Hybrid Search Engine] Scraping Google Maps + TikTok for "${query}" (${radiusKm} km)...`);
+    console.log(`\n🚀 [Hybrid Search Engine] Scraping GMaps + Social Leads (TikTok, IG, FB) for "${query}" (${radiusKm} km)...`);
 
-    const [gmaps, tiktok] = await Promise.allSettled([
+    const [gmaps, social] = await Promise.allSettled([
       scrapeKostInRadius({ locationQuery: query, centerLat: centerLat, centerLng: centerLng, radiusKm: radiusKm, limit: 15, headless: true }),
-      scrapeTikTokKostRecommendations({ locationQuery: query, limitVideos: 3, headless: true })
+      scrapeSocialHiddenGems({ locationQuery: query, sortBy: sortBy })
     ]);
 
     const resultPayload = {
       timestamp: new Date().toISOString(),
       googleMaps: gmaps.status === 'fulfilled' ? gmaps.value : { error: gmaps.reason },
-      tiktokLeads: tiktok.status === 'fulfilled' ? tiktok.value : { error: tiktok.reason }
+      socialLeads: social.status === 'fulfilled' ? social.value : { error: social.reason }
     };
 
-    queryCache.set(cacheKey, resultPayload, 600000); // 10 minutes cache
+    queryCache.set(cacheKey, resultPayload, 300000); // 5 minutes cache
 
     res.json({ success: true, cached: false, ...resultPayload });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /api/social-leads?q=UGM+Yogyakarta&sort=newest
+ */
+app.get('/api/social-leads', async (req, res) => {
+  try {
+    const query = req.query.q || 'Jakarta';
+    const sortBy = req.query.sort || 'newest';
+
+    const data = await scrapeSocialHiddenGems({ locationQuery: query, sortBy: sortBy });
+    res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -92,7 +109,7 @@ app.get('*', (req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n==================================================`);
-  console.log(`🌐 [InKOS Production Server] Running on Port ${PORT}`);
+  console.log(`🌐 [InKOS Multi-Source Engine] Running on Port ${PORT}`);
   console.log(`📡 Healthcheck: http://localhost:${PORT}/api/health`);
   console.log(`==================================================\n`);
 });
