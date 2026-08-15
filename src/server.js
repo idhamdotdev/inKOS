@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { scrapeKostInRadius, geocodeLocation } from './scraper/gmapsScraper.js';
 import { scrapeSocialHiddenGems } from './scraper/socialScraper.js';
+import { scrapeRentalDirectory } from './scraper/rentalScraper.js';
 import { queryCache } from './utils/cache.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -14,7 +15,6 @@ const PORT = process.env.PORT || 3001;
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
 
-// Enable CORS
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
@@ -35,7 +35,7 @@ app.get('/api/health', (req, res) => {
 
 /**
  * GET /api/hybrid-search?q=UGM+Yogyakarta&radius=2&sort=newest
- * Combines Google Maps Places + Multi-Source Social Leads (TikTok, Instagram, Facebook)
+ * Parallel High-Speed Tri-Engine Scraper (GMaps + Social Leads + Rental Directories)
  */
 app.get('/api/hybrid-search', async (req, res) => {
   try {
@@ -53,37 +53,24 @@ app.get('/api/hybrid-search', async (req, res) => {
       return res.json({ success: true, cached: true, ...cachedData });
     }
 
-    console.log(`\n🚀 [Hybrid Search Engine] Scraping GMaps + Social Leads (TikTok, IG, FB) for "${query}" (${radiusKm} km)...`);
+    console.log(`\n🚀 [Tri-Engine Search] Scraping GMaps + Social (TikTok/FB/IG) + Directories (OLX/Mamikos) for "${query}" (${radiusKm} km)...`);
 
-    const [gmaps, social] = await Promise.allSettled([
-      scrapeKostInRadius({ locationQuery: query, centerLat: centerLat, centerLng: centerLng, radiusKm: radiusKm, limit: 15, headless: true }),
-      scrapeSocialHiddenGems({ locationQuery: query, sortBy: sortBy })
+    const [gmaps, social, directory] = await Promise.allSettled([
+      scrapeKostInRadius({ locationQuery: query, centerLat: centerLat, centerLng: centerLng, radiusKm: radiusKm, limit: 20, headless: true }),
+      scrapeSocialHiddenGems({ locationQuery: query, sortBy: sortBy }),
+      scrapeRentalDirectory({ locationQuery: query })
     ]);
 
     const resultPayload = {
       timestamp: new Date().toISOString(),
       googleMaps: gmaps.status === 'fulfilled' ? gmaps.value : { error: gmaps.reason },
-      socialLeads: social.status === 'fulfilled' ? social.value : { error: social.reason }
+      socialLeads: social.status === 'fulfilled' ? social.value : { error: social.reason },
+      rentalDirectory: directory.status === 'fulfilled' ? directory.value : []
     };
 
     queryCache.set(cacheKey, resultPayload, 300000); // 5 minutes cache
 
     res.json({ success: true, cached: false, ...resultPayload });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-/**
- * GET /api/social-leads?q=UGM+Yogyakarta&sort=newest
- */
-app.get('/api/social-leads', async (req, res) => {
-  try {
-    const query = req.query.q || 'Jakarta';
-    const sortBy = req.query.sort || 'newest';
-
-    const data = await scrapeSocialHiddenGems({ locationQuery: query, sortBy: sortBy });
-    res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -109,7 +96,7 @@ app.get('*', (req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n==================================================`);
-  console.log(`🌐 [InKOS Multi-Source Engine] Running on Port ${PORT}`);
+  console.log(`🌐 [InKOS Tri-Engine Scraper Running] Port: ${PORT}`);
   console.log(`📡 Healthcheck: http://localhost:${PORT}/api/health`);
   console.log(`==================================================\n`);
 });

@@ -99,7 +99,7 @@
       vertical-align: middle;
     }
 
-    /* Onboarding Popup Modal Overlay */
+    /* Modal Overlay */
     .modal-overlay {
       position: absolute;
       top: 0; left: 0; right: 0; bottom: 0;
@@ -195,7 +195,7 @@
 
     /* Minimalist Sidebar */
     .sidebar {
-      width: 450px;
+      width: 460px;
       background: var(--bg-panel);
       backdrop-filter: blur(16px);
       border-left: 1px solid var(--border);
@@ -277,8 +277,8 @@
     /* Minimal Tabs */
     .tabs-bar { display: flex; border-bottom: 1px solid var(--border); background: #09090b; }
     .tab-btn {
-      flex: 1; padding: 10px; text-align: center; font-size: 12px; font-weight: 600; color: var(--text-tertiary);
-      cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; display: flex; align-items: center; justify-content: center; gap: 6px;
+      flex: 1; padding: 10px; text-align: center; font-size: 11px; font-weight: 600; color: var(--text-tertiary);
+      cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; display: flex; align-items: center; justify-content: center; gap: 5px;
     }
     .tab-btn.active { color: #fff; border-bottom-color: #f0f6fc; }
 
@@ -316,6 +316,7 @@
     }
     .pill-tag.platform { border-color: rgba(240, 246, 252, 0.2); color: #f0f6fc; font-weight: 600; }
     .pill-tag.fresh { border-color: rgba(56, 189, 248, 0.4); color: #38bdf8; }
+    .pill-tag.specs { border-color: rgba(168, 85, 247, 0.3); color: #d8b4fe; }
 
     .amenities-row { display: flex; gap: 4px; flex-wrap: wrap; }
     .amenity-chip { font-size: 10px; color: var(--text-tertiary); background: #0d1117; padding: 2px 5px; border-radius: 3px; border: 1px solid rgba(240,246,252,0.06); }
@@ -349,7 +350,6 @@
     .btn-bookmark:hover { color: #fff; }
     .btn-bookmark.bookmarked { color: #38bdf8; }
 
-    /* Minimalist Map Marker Badges */
     .gmaps-price-marker {
       background: #09090b;
       border: 1px solid rgba(240, 246, 252, 0.3);
@@ -373,7 +373,7 @@
 </head>
 <body>
 
-  <!-- Minimalist Onboarding Popup Modal -->
+  <!-- Minimalist Onboarding Modal -->
   <div id="welcomeModal" class="modal-overlay">
     <div class="modal-card">
       <div>
@@ -490,11 +490,15 @@
       <div class="tabs-bar">
         <div id="tabGmaps" class="tab-btn active">
           <svg class="icon" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-          <span>Google Maps (<span id="gmapsCount">0</span>)</span>
+          <span>Maps (<span id="gmapsCount">0</span>)</span>
         </div>
         <div id="tabSocial" class="tab-btn">
           <svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-          <span>Social Leads (<span id="socialCount">0</span>)</span>
+          <span>Social (<span id="socialCount">0</span>)</span>
+        </div>
+        <div id="tabDirectory" class="tab-btn">
+          <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
+          <span>Directory (<span id="dirCount">0</span>)</span>
         </div>
         <div id="tabSaved" class="tab-btn">
           <svg class="icon" viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
@@ -505,7 +509,7 @@
       <div id="loading" class="loader">
         <div class="spinner"></div>
         <div style="font-size: 12px; font-weight: 600; color: #fff;">Searching Area</div>
-        <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 2px;">Scraping Google Places, TikTok, Instagram & Facebook leads</div>
+        <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 2px;">Scraping Google Maps, TikTok, Instagram, FB & Directories</div>
       </div>
 
       <div id="resultsList" class="results-container">
@@ -520,11 +524,10 @@
   <script>
     let map, circleOverlay, centerMarker;
     let markersLayer = L.layerGroup();
-    let currentData = { googleMaps: [], social: [] };
+    let currentData = { googleMaps: [], social: [], directory: [] };
     let currentTab = 'gmaps';
     let filterGender = 'all';
     let filterMaxPrice = 'all';
-    let filterPlatform = 'all';
     let savedListings = JSON.parse(localStorage.getItem('inkos_saved') || '[]');
 
     function initMap() {
@@ -624,11 +627,13 @@
         if (json.success) {
           const gmaps = json.googleMaps?.listings || [];
           const social = json.socialLeads?.leads || [];
+          const directory = json.rentalDirectory || [];
 
-          currentData = { googleMaps: gmaps, social: social };
+          currentData = { googleMaps: gmaps, social: social, directory: directory };
 
           document.getElementById('gmapsCount').innerText = gmaps.length;
           document.getElementById('socialCount').innerText = social.length;
+          document.getElementById('dirCount').innerText = directory.length;
 
           const center = json.googleMaps?.searchCenter || { lat: lat || -6.2088, lng: lng || 106.8456, displayName: query };
           setCenterPin(center.lat, center.lng, query || "Search Point");
@@ -698,28 +703,29 @@
     }
 
     function exportToCsv() {
-      const allItems = [...(currentData.googleMaps || []), ...(currentData.social || [])];
+      const allItems = [...(currentData.googleMaps || []), ...(currentData.social || []), ...(currentData.directory || [])];
       if (allItems.length === 0) {
         alert("No listings available to export. Run a search first.");
         return;
       }
 
-      let csv = "ID,Platform / Source,Price,Gender,Time / Distance,Phone,Link\n";
+      let csv = "ID,Platform / Source,Price,Gender,Specs,Time / Distance,Phone,Link\n";
       allItems.forEach(item => {
         const title = (item.title || item.source || '').replace(/"/g, '""');
         const price = (item.priceText || item.estimatedPrice || '').replace(/"/g, '""');
         const gender = item.genderType || '';
+        const specs = item.roomSpecs ? `${item.roomSpecs.size || ''} | ${item.roomSpecs.electricity || ''}` : '';
         const meta = item.distanceKm ? `${item.distanceKm} km` : item.timeAgo || '';
         const phone = item.phone || '';
         const link = item.googleMapsUrl || item.sourceUrl || '';
-        csv += `"${item.id}","${title}","${price}","${gender}","${meta}","${phone}","${link}"\n`;
+        csv += `"${item.id}","${title}","${price}","${gender}","${specs}","${meta}","${phone}","${link}"\n`;
       });
 
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.setAttribute("href", url);
-      link.setAttribute("download", `inkos_social_leads_${Date.now()}.csv`);
+      link.setAttribute("download", `inkos_full_data_${Date.now()}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -729,150 +735,73 @@
       const container = document.getElementById('resultsList');
       container.innerHTML = '';
 
-      if (currentTab === 'gmaps') {
-        let filtered = currentData.googleMaps.filter(item => {
-          if (filterGender !== 'all' && item.genderType.toLowerCase() !== filterGender) return false;
-          if (filterMaxPrice !== 'all' && item.rawPriceMonth && item.rawPriceMonth > parseInt(filterMaxPrice, 10)) return false;
-          return true;
-        });
+      let listToRender = [];
+      if (currentTab === 'gmaps') listToRender = currentData.googleMaps;
+      else if (currentTab === 'social') listToRender = currentData.social;
+      else if (currentTab === 'directory') listToRender = currentData.directory;
+      else if (currentTab === 'saved') listToRender = savedListings;
 
-        if (filtered.length === 0) {
-          container.innerHTML = `<div style="color: var(--text-tertiary); text-align: center; padding: 30px; font-size: 12px;">No listings matched the selected filters.</div>`;
-          return;
-        }
+      let filtered = listToRender.filter(item => {
+        if (filterGender !== 'all' && item.genderType && item.genderType.toLowerCase() !== filterGender) return false;
+        if (filterMaxPrice !== 'all' && item.rawPriceMonth && item.rawPriceMonth > parseInt(filterMaxPrice, 10)) return false;
+        return true;
+      });
 
-        filtered.forEach(item => {
-          const saved = isSaved(item);
-          const card = document.createElement('div');
-          card.className = 'result-card';
-          card.innerHTML = `
-            <div class="card-top">
-              <div class="card-title">${item.title}</div>
-              <div class="card-price">${item.priceText}</div>
-            </div>
-            <div class="card-tags">
-              <span class="pill-tag">${item.category}</span>
-              <span class="pill-tag">
-                <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                ${item.distanceKm} km
-              </span>
-              <span class="pill-tag">
-                <svg class="icon" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-                ${item.rating}
-              </span>
-            </div>
-            <div class="amenities-row">
-              ${item.amenities.map(a => `<span class="amenity-chip">${a}</span>`).join('')}
-            </div>
-            <div class="card-actions">
-              <div style="display:flex; gap:6px;">
-                <a href="${item.googleMapsUrl}" target="_blank" class="btn-link">
-                  <svg class="icon" viewBox="0 0 24 24"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></svg>
-                  Google Maps
-                </a>
-                ${item.whatsappUrl ? `
-                <a href="${item.whatsappUrl}" target="_blank" class="btn-link">
-                  <svg class="icon" viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
-                  WhatsApp
-                </a>` : ''}
-              </div>
-              <button class="btn-bookmark ${saved ? 'bookmarked' : ''}" onclick='toggleSave(${JSON.stringify(item)})' title="Save to Favorites">
-                <svg class="icon" viewBox="0 0 24 24" style="fill: ${saved ? 'currentColor' : 'none'};"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
-              </button>
-            </div>
-          `;
-          container.appendChild(card);
-        });
-
-      } else if (currentTab === 'social') {
-        let filtered = currentData.social.filter(item => {
-          if (filterGender !== 'all' && item.genderType && item.genderType.toLowerCase() !== filterGender) return false;
-          if (filterMaxPrice !== 'all' && item.rawPriceMonth && item.rawPriceMonth > parseInt(filterMaxPrice, 10)) return false;
-          return true;
-        });
-
-        if (filtered.length === 0) {
-          container.innerHTML = `<div style="color: var(--text-tertiary); text-align: center; padding: 30px; font-size: 12px;">No social leads matched the selected filters.</div>`;
-          return;
-        }
-
-        filtered.forEach(item => {
-          const saved = isSaved(item);
-          const card = document.createElement('div');
-          card.className = 'result-card';
-          card.innerHTML = `
-            <div class="card-top">
-              <div class="card-title" style="font-size: 12px; color: var(--text-secondary); display:flex; align-items:center; gap:6px;">
-                <span class="pill-tag platform">${item.platform}</span>
-                <span>${item.source}</span>
-              </div>
-              <div class="card-price">${item.estimatedPrice}</div>
-            </div>
-            <div style="font-size: 12px; color: #c9d1d9; background: #0d1117; padding: 8px 10px; border-radius: 6px; line-height: 1.4; border: 1px solid var(--border);">
-              "${item.commentText}"
-            </div>
-            <div class="card-tags">
-              <span class="pill-tag">${item.genderType}</span>
-              <span class="pill-tag fresh">
-                <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                ${item.timeAgo}
-              </span>
-            </div>
-            <div class="amenities-row">
-              ${item.amenities.map(a => `<span class="amenity-chip">${a}</span>`).join('')}
-            </div>
-            <div class="card-actions">
-              <div style="display:flex; gap:6px;">
-                ${item.whatsappUrl ? `
-                <a href="${item.whatsappUrl}" target="_blank" class="btn-link">
-                  <svg class="icon" viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
-                  WhatsApp (${item.phone || 'Owner'})
-                </a>` : ''}
-                <a href="${item.sourceUrl}" target="_blank" class="btn-link">
-                  View Post
-                </a>
-              </div>
-              <button class="btn-bookmark ${saved ? 'bookmarked' : ''}" onclick='toggleSave(${JSON.stringify(item)})' title="Save to Favorites">
-                <svg class="icon" viewBox="0 0 24 24" style="fill: ${saved ? 'currentColor' : 'none'};"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
-              </button>
-            </div>
-          `;
-          container.appendChild(card);
-        });
-
-      } else if (currentTab === 'saved') {
-        if (savedListings.length === 0) {
-          container.innerHTML = `<div style="color: var(--text-tertiary); text-align: center; padding: 40px 20px; font-size: 12px;">No saved listings yet. Click the bookmark icon on any card to save it.</div>`;
-          return;
-        }
-
-        savedListings.forEach(item => {
-          const card = document.createElement('div');
-          card.className = 'result-card';
-          card.innerHTML = `
-            <div class="card-top">
-              <div class="card-title">${item.title || item.source}</div>
-              <div class="card-price">${item.priceText || item.estimatedPrice}</div>
-            </div>
-            <div class="card-tags">
-              ${item.platform ? `<span class="pill-tag platform">${item.platform}</span>` : ''}
-              <span class="pill-tag">${item.genderType || item.category}</span>
-              ${item.distanceKm ? `<span class="pill-tag">${item.distanceKm} km</span>` : ''}
-            </div>
-            ${item.commentText ? `<div style="font-size: 12px; color: #c9d1d9; background: #0d1117; padding: 8px 10px; border-radius: 6px; line-height: 1.4; border: 1px solid var(--border);">"${item.commentText}"</div>` : ''}
-            <div class="card-actions">
-              <div style="display:flex; gap:6px;">
-                ${item.googleMapsUrl ? `<a href="${item.googleMapsUrl}" target="_blank" class="btn-link">Google Maps</a>` : ''}
-                ${item.whatsappUrl ? `<a href="${item.whatsappUrl}" target="_blank" class="btn-link">WhatsApp</a>` : ''}
-              </div>
-              <button class="btn-bookmark bookmarked" onclick='toggleSave(${JSON.stringify(item)})' title="Remove from Favorites">
-                <svg class="icon" viewBox="0 0 24 24" style="fill: currentColor;"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
-              </button>
-            </div>
-          `;
-          container.appendChild(card);
-        });
+      if (filtered.length === 0) {
+        container.innerHTML = `<div style="color: var(--text-tertiary); text-align: center; padding: 30px; font-size: 12px;">No listings found for this category or filter.</div>`;
+        return;
       }
+
+      filtered.forEach(item => {
+        const saved = isSaved(item);
+        const card = document.createElement('div');
+        card.className = 'result-card';
+        card.innerHTML = `
+          <div class="card-top">
+            <div class="card-title" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+              ${item.platform ? `<span class="pill-tag platform">${item.platform}</span>` : ''}
+              <span>${item.title || item.source}</span>
+            </div>
+            <div class="card-price">${item.priceText || item.estimatedPrice}</div>
+          </div>
+          ${item.commentText ? `<div style="font-size: 12px; color: #c9d1d9; background: #0d1117; padding: 8px 10px; border-radius: 6px; line-height: 1.4; border: 1px solid var(--border);">"${item.commentText}"</div>` : ''}
+          <div class="card-tags">
+            <span class="pill-tag">${item.genderType || item.category || 'Campur'}</span>
+            ${item.distanceKm ? `
+            <span class="pill-tag">
+              <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              ${item.distanceKm} km
+            </span>` : ''}
+            ${item.timeAgo ? `<span class="pill-tag fresh">${item.timeAgo}</span>` : ''}
+            ${item.roomSpecs?.size ? `<span class="pill-tag specs">${item.roomSpecs.size}</span>` : ''}
+            ${item.roomSpecs?.electricity ? `<span class="pill-tag specs">${item.roomSpecs.electricity}</span>` : ''}
+            ${item.roomSpecs?.curfew ? `<span class="pill-tag">${item.roomSpecs.curfew}</span>` : ''}
+          </div>
+          <div class="amenities-row">
+            ${(item.amenities || []).map(a => `<span class="amenity-chip">${a}</span>`).join('')}
+          </div>
+          <div class="card-actions">
+            <div style="display:flex; gap:6px;">
+              ${item.googleMapsUrl ? `
+              <a href="${item.googleMapsUrl}" target="_blank" class="btn-link">
+                <svg class="icon" viewBox="0 0 24 24"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></svg>
+                Google Maps
+              </a>` : ''}
+              ${item.whatsappUrl ? `
+              <a href="${item.whatsappUrl}" target="_blank" class="btn-link">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                WhatsApp (${item.phone || 'Owner'})
+              </a>` : ''}
+              ${item.sourceUrl && !item.googleMapsUrl ? `
+              <a href="${item.sourceUrl}" target="_blank" class="btn-link">View Listing</a>` : ''}
+            </div>
+            <button class="btn-bookmark ${saved ? 'bookmarked' : ''}" onclick='toggleSave(${JSON.stringify(item)})' title="Save to Favorites">
+              <svg class="icon" viewBox="0 0 24 24" style="fill: ${saved ? 'currentColor' : 'none'};"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+            </button>
+          </div>
+        `;
+        container.appendChild(card);
+      });
     }
 
     // Modal Search Trigger
@@ -933,6 +862,7 @@
       currentTab = 'gmaps';
       document.getElementById('tabGmaps').classList.add('active');
       document.getElementById('tabSocial').classList.remove('active');
+      document.getElementById('tabDirectory').classList.remove('active');
       document.getElementById('tabSaved').classList.remove('active');
       renderResults();
     });
@@ -941,6 +871,16 @@
       currentTab = 'social';
       document.getElementById('tabSocial').classList.add('active');
       document.getElementById('tabGmaps').classList.remove('active');
+      document.getElementById('tabDirectory').classList.remove('active');
+      document.getElementById('tabSaved').classList.remove('active');
+      renderResults();
+    });
+
+    document.getElementById('tabDirectory').addEventListener('click', () => {
+      currentTab = 'directory';
+      document.getElementById('tabDirectory').classList.add('active');
+      document.getElementById('tabGmaps').classList.remove('active');
+      document.getElementById('tabSocial').classList.remove('active');
       document.getElementById('tabSaved').classList.remove('active');
       renderResults();
     });
@@ -950,6 +890,7 @@
       document.getElementById('tabSaved').classList.add('active');
       document.getElementById('tabGmaps').classList.remove('active');
       document.getElementById('tabSocial').classList.remove('active');
+      document.getElementById('tabDirectory').classList.remove('active');
       renderResults();
     });
 

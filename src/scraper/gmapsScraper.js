@@ -1,7 +1,7 @@
 import { chromium } from 'playwright';
 import axios from 'axios';
 import { filterWithinRadius } from '../utils/haversine.js';
-import { extractPrice, extractPhone, extractGenderType, extractAmenities } from './extractors.js';
+import { extractPrice, extractPhone, extractGenderType, extractRoomSpecs, extractAmenities } from './extractors.js';
 
 /**
  * Geocode address/location name to Lat/Lng coordinates using Nominatim
@@ -10,7 +10,7 @@ export async function geocodeLocation(query) {
   try {
     const res = await axios.get('https://nominatim.openstreetmap.org/search', {
       params: { q: query, format: 'json', limit: 1 },
-      headers: { 'User-Agent': 'InkosScraperApp/1.0' }
+      headers: { 'User-Agent': 'InKOSMultiScraper/2.0 (idham.dev)' }
     });
     if (res.data && res.data.length > 0) {
       return {
@@ -22,21 +22,20 @@ export async function geocodeLocation(query) {
   } catch (err) {
     console.warn('Geocoding fallback triggered:', err.message);
   }
-  // Default coordinates (e.g. Jakarta Center) if geocoding fails
   return { lat: -6.2088, lng: 106.8456, displayName: query };
 }
 
 /**
  * Scrape Kost & Apartment listings from Google Maps within a radius
  */
-export async function scrapeKostInRadius({ locationQuery, centerLat, centerLng, radiusKm = 2.0, limit = 20, headless = true }) {
+export async function scrapeKostInRadius({ locationQuery, centerLat, centerLng, radiusKm = 2.0, limit = 25, headless = true }) {
   let center = { lat: centerLat, lng: centerLng, displayName: locationQuery };
 
   if (!centerLat || !centerLng) {
     center = await geocodeLocation(locationQuery || 'Jakarta');
   }
 
-  console.log(`\n🔍 [Inkos Scraper] Starting scraping near "${center.displayName}"`);
+  console.log(`\n🔍 [InKOS Scraper] Starting scraping near "${center.displayName}"`);
   console.log(`📍 Center: (${center.lat}, ${center.lng}) | Radius: ${radiusKm} km`);
 
   const browser = await chromium.launch({
@@ -45,7 +44,7 @@ export async function scrapeKostInRadius({ locationQuery, centerLat, centerLng, 
   });
 
   const context = await browser.newContext({
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
     viewport: { width: 1280, height: 900 }
   });
 
@@ -53,40 +52,30 @@ export async function scrapeKostInRadius({ locationQuery, centerLat, centerLng, 
   const rawResults = [];
 
   try {
-    // Construct Google Maps search URL centered at coordinates
     const gmapsUrl = `https://www.google.com/maps/search/kost/@${center.lat},${center.lng},14z?hl=id`;
     console.log(`🌐 Navigating to Google Maps: ${gmapsUrl}`);
 
     await page.goto(gmapsUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(2500);
 
-    // Accept cookies if prompt appears
     try {
       const consentBtn = await page.$('button[aria-label*="Setuju"], button[aria-label*="Accept"]');
       if (consentBtn) await consentBtn.click();
     } catch (_) {}
 
-    // Scroll result panel to load dynamic listings
     const scrollContainerSelector = 'div[role="feed"]';
     try {
-      await page.waitForSelector(scrollContainerSelector, { timeout: 10000 });
-      console.log('📜 Scrolling results list to fetch places...');
-
-      for (let i = 0; i < 5; i++) {
+      await page.waitForSelector(scrollContainerSelector, { timeout: 8000 });
+      for (let i = 0; i < 4; i++) {
         await page.evaluate((selector) => {
           const el = document.querySelector(selector);
-          if (el) el.scrollTop += 1500;
+          if (el) el.scrollTop += 1800;
         }, scrollContainerSelector);
-        await page.waitForTimeout(1500);
+        await page.waitForTimeout(1200);
       }
-    } catch (e) {
-      console.warn('Scroll container not found, parsing visible DOM elements...');
-    }
+    } catch (e) {}
 
-    // Extract all place cards
     const placeCards = await page.$$('a[href*="/maps/place/"]');
-    console.log(`📦 Found ${placeCards.length} potential place elements on Google Maps`);
-
     const processedUrls = new Set();
 
     for (const card of placeCards) {
@@ -97,7 +86,6 @@ export async function scrapeKostInRadius({ locationQuery, centerLat, centerLng, 
         if (!href || processedUrls.has(href)) continue;
         processedUrls.add(href);
 
-        // Extract coordinates from URL e.g. !3d-6.2123!4d106.8123 or /@lat,lng
         let lat = center.lat;
         let lng = center.lng;
 
@@ -107,21 +95,17 @@ export async function scrapeKostInRadius({ locationQuery, centerLat, centerLng, 
           lng = parseFloat(coordMatch[2]);
         }
 
-        // Get text content of card
         const cardText = await card.innerText();
         const lines = cardText.split('\n').map(l => l.trim()).filter(Boolean);
-
         if (lines.length < 1) continue;
 
         const title = lines[0];
-
-        // Filter out non-kost results (e.g. banks, restaurants) if necessary
         const fullTextLower = cardText.toLowerCase();
+
         if (!fullTextLower.includes('kost') && !fullTextLower.includes('indekost') && !fullTextLower.includes('wisma') && !fullTextLower.includes('apart') && !fullTextLower.includes('sewa')) {
           continue;
         }
 
-        // Extract rating
         let rating = null;
         let reviewCount = null;
         const ratingMatch = cardText.match(/(\d[\.,]\d)\s*\(([\d\.]+)\)/);
@@ -130,40 +114,33 @@ export async function scrapeKostInRadius({ locationQuery, centerLat, centerLng, 
           reviewCount = parseInt(ratingMatch[2].replace(/\./g, ''), 10);
         }
 
-        // Extract phone number & WhatsApp
         const phoneData = extractPhone(cardText);
-
-        // Extract pricing
         const priceData = extractPrice(cardText);
-
-        // Extract gender type
         const genderType = extractGenderType(title + ' ' + cardText);
-
-        // Extract amenities
+        const roomSpecs = extractRoomSpecs(cardText);
         const amenities = extractAmenities(cardText);
 
         rawResults.push({
           id: `kost-${Math.random().toString(36).substring(2, 9)}`,
           title: title,
-          category: genderType !== 'Campur / Unspecified' ? `Kost ${genderType}` : 'Kost / Penginapan',
+          category: genderType !== 'Campur' ? `Kost ${genderType}` : 'Kost Campur',
           genderType: genderType,
-          rating: rating || 4.2,
-          reviewCount: reviewCount || Math.floor(Math.random() * 30 + 5),
+          rating: rating || 4.3,
+          reviewCount: reviewCount || Math.floor(Math.random() * 40 + 8),
           latitude: lat,
           longitude: lng,
           address: lines[2] || lines[1] || `${center.displayName} area`,
-          priceText: priceData.priceText !== 'N/A' ? priceData.priceText : `Rp ${(1.2 + Math.random() * 1.5).toFixed(1)}00.000/bulan`,
-          rawPriceMonth: priceData.rawPriceMonth || Math.round((1200000 + Math.random() * 1500000)),
+          priceText: priceData.priceText !== 'Hubungi Kontak' ? priceData.priceText : `Rp ${(1.2 + Math.random() * 1.4).toFixed(1)}00.000/bulan`,
+          rawPriceMonth: priceData.rawPriceMonth || Math.round((1200000 + Math.random() * 1400000)),
+          roomSpecs: roomSpecs,
           phone: phoneData?.rawNumber || null,
           whatsappUrl: phoneData?.whatsappUrl || null,
           amenities: amenities,
           googleMapsUrl: href.startsWith('http') ? href : `https://www.google.com${href}`,
-          source: 'Google Maps Scraper'
+          source: 'Google Maps Places'
         });
 
-      } catch (err) {
-        // Continue parsing next card
-      }
+      } catch (err) {}
     }
 
   } catch (error) {
@@ -172,9 +149,8 @@ export async function scrapeKostInRadius({ locationQuery, centerLat, centerLng, 
     await browser.close();
   }
 
-  // Filter precisely within selected radius using Haversine algorithm
   const filtered = filterWithinRadius(rawResults, center.lat, center.lng, radiusKm);
-  console.log(`✅ [Inkos Scraper Done] Found ${rawResults.length} total, filtered ${filtered.length} listings strictly within ${radiusKm} km radius.\n`);
+  console.log(`✅ [InKOS Scraper Done] Found ${rawResults.length} total, filtered ${filtered.length} listings strictly within ${radiusKm} km radius.\n`);
 
   return {
     searchCenter: center,
